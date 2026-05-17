@@ -1,37 +1,24 @@
-#include <Arduino.h>
 #include <LiquidCrystal.h>
+#include <Servo.h>
 
 // ----------------------------------------------------------------------------
 // LCD SETUP
 // ----------------------------------------------------------------------------
-const int rs = 19, en = 18, d4 = 5, d5 = 17, d6 = 16, d7 = 4;
-LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
+// Arduino Pins: RS=12, EN=11, D4=5, D5=4, D6=3, D7=2
+LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
 
 // ----------------------------------------------------------------------------
-// SERVO CONFIGURATION
+// SERVO SETUP
 // ----------------------------------------------------------------------------
-#define PIN_FL 13  // Front Left
-#define PIN_FR 12  // Front Right
-#define PIN_RL 14  // Rear Left
-#define PIN_RR 27  // Rear Right
+Servo servoFL;  // Front Left
+Servo servoFR;  // Front Right
+Servo servoRL;  // Rear Left
+Servo servoRR;  // Rear Right
 
-#define SERVO_MIN_US    500
-#define SERVO_MAX_US    2500
-#define SERVO_PERIOD_US 20000UL
-
-// Helper: Converts angles (0-180) to 16-bit duty cycle
-uint32_t angle_to_duty(float angle_deg) {
-    if (angle_deg < 0.0f)   angle_deg = 0.0f;
-    if (angle_deg > 180.0f) angle_deg = 180.0f;
-    uint32_t pulse_us = SERVO_MIN_US + (uint32_t)((angle_deg / 180.0f) * (SERVO_MAX_US - SERVO_MIN_US));
-    uint32_t duty = (pulse_us * 65535UL) / SERVO_PERIOD_US;
-    if (duty > 65535UL) duty = 65535UL;
-    return duty;
-}
-
-void move_servo(uint8_t pin, float angle) {
-    ledcWrite(pin, angle_to_duty(angle));
-}
+#define PIN_FL 6
+#define PIN_FR 7
+#define PIN_RL 8
+#define PIN_RR 9
 
 // ----------------------------------------------------------------------------
 // FACE HELPER FUNCTION
@@ -39,11 +26,9 @@ void move_servo(uint8_t pin, float angle) {
 void draw_face(const char* face, const char* text) {
     lcd.clear();
     
-    // Automatically center the text on the screen
     int pad_face = (16 - strlen(face)) / 2;
     int pad_text = (16 - strlen(text)) / 2;
     
-    // Safety check to prevent negative padding
     if (pad_face < 0) pad_face = 0;
     if (pad_text < 0) pad_text = 0;
     
@@ -58,76 +43,79 @@ void draw_face(const char* face, const char* text) {
 // SETUP
 // ----------------------------------------------------------------------------
 void setup() {
-    Serial.begin(115200);
+    Serial.begin(9600);
     
-    // Start LCD and show custom boot screen
     lcd.begin(16, 2);
-    lcd.setCursor(1, 0);
-    lcd.print("Group E Walker");
-    lcd.setCursor(1, 1);
-    lcd.print("ID: 2406368864");
-    delay(2000);
+    draw_face("( o _ o )", "Booting...");
+    delay(1500);
     
     // Attach servos
-    ledcAttach(PIN_FL, 50, 16);
-    ledcAttach(PIN_FR, 50, 16);
-    ledcAttach(PIN_RL, 50, 16);
-    ledcAttach(PIN_RR, 50, 16);
+    servoFL.attach(PIN_FL);
+    servoFR.attach(PIN_FR);
+    servoRL.attach(PIN_RL);
+    servoRR.attach(PIN_RR);
 
-    // Move to neutral position (90 degrees is the physical "0,0" center)
-    move_servo(PIN_FL, 90);
-    move_servo(PIN_FR, 90);
-    move_servo(PIN_RL, 90);
-    move_servo(PIN_RR, 90);
+    // Initial neutral stance
+    servoFL.write(90);
+    servoFR.write(90);
+    servoRL.write(90);
+    servoRR.write(90);
+    delay(1000);
 }
 
 // ----------------------------------------------------------------------------
-// MAIN WALKING LOOP
+// MAIN WALKING LOOP (CREEP GAIT)
 // ----------------------------------------------------------------------------
 void loop() {
-    // Walk cycle parameters
-    float forward_angle = 120.0;
-    float backward_angle = 60.0;
-    int step_delay = 500;  // Time spent moving
-    int sleep_delay = 800; // Time spent resting
+    int forward_angle = 110;
+    int backward_angle = 50;
+    
+    // The delay between EACH individual servo movement
+    int sequence_delay = 300; 
 
     // ---------------------------------------------------------
-    // PHASE 1: Step forward (Moving = Yeay Face)
+    // SEQUENCE 1: STEPPING FORWARD (One by One)
     // ---------------------------------------------------------
-    draw_face("( ^ _ ^ )", "Yeay!");
-    move_servo(PIN_FL, forward_angle);
-    move_servo(PIN_RR, forward_angle);
-    move_servo(PIN_FR, backward_angle);
-    move_servo(PIN_RL, backward_angle);
-    delay(step_delay);
+    draw_face("( ^ _ ^ )", "Creeping...");
+
+    servoFL.write(forward_angle);  // 1. Move Front Left
+    delay(sequence_delay);
+
+    servoRR.write(forward_angle);  // 2. Move Rear Right
+    delay(sequence_delay);
+
+    servoFR.write(backward_angle); // 3. Move Front Right
+    delay(sequence_delay);
+
+    servoRL.write(backward_angle); // 4. Move Rear Left
+    delay(sequence_delay);
 
     // ---------------------------------------------------------
-    // PHASE 2: Neutral stand (Resting = Sleeping Face)
+    // SEQUENCE 2: PAUSE
+    // ---------------------------------------------------------
+    draw_face("( - _ - )", "Pause...");
+    delay(600);
+
+    // ---------------------------------------------------------
+    // SEQUENCE 3: RESET TO NEUTRAL (One by One)
+    // ---------------------------------------------------------
+    draw_face("( > _ < )", "Resetting...");
+
+    servoFL.write(90);  // 1. Reset Front Left
+    delay(sequence_delay);
+
+    servoRR.write(90);  // 2. Reset Rear Right
+    delay(sequence_delay);
+
+    servoFR.write(90);  // 3. Reset Front Right
+    delay(sequence_delay);
+
+    servoRL.write(90);  // 4. Reset Rear Left
+    delay(sequence_delay);
+
+    // ---------------------------------------------------------
+    // SEQUENCE 4: PAUSE
     // ---------------------------------------------------------
     draw_face("( - _ - )", "Zzz...");
-    move_servo(PIN_FL, 90);
-    move_servo(PIN_RR, 90);
-    move_servo(PIN_FR, 90);
-    move_servo(PIN_RL, 90);
-    delay(sleep_delay);
-
-    // ---------------------------------------------------------
-    // PHASE 3: Step alternate (Moving = Yeay Face)
-    // ---------------------------------------------------------
-    draw_face("( ^ _ ^ )", "Yeay!");
-    move_servo(PIN_FL, backward_angle);
-    move_servo(PIN_RR, backward_angle);
-    move_servo(PIN_FR, forward_angle);
-    move_servo(PIN_RL, forward_angle);
-    delay(step_delay);
-
-    // ---------------------------------------------------------
-    // PHASE 4: Neutral stand (Resting = Sleeping Face)
-    // ---------------------------------------------------------
-    draw_face("( - _ - )", "Zzz...");
-    move_servo(PIN_FL, 90);
-    move_servo(PIN_RR, 90);
-    move_servo(PIN_FR, 90);
-    move_servo(PIN_RL, 90);
-    delay(sleep_delay);
+    delay(600);
 }
