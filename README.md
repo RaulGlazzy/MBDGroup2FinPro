@@ -1,4 +1,4 @@
-# Rocky: Bio-Inspired Quadruped Robot 🕷️🤖
+# Rocky: Rocky Inspired 4 legged Robot
 
 **Universitas Indonesia - Department of Electrical Engineering Computer Engineering KKI** **Microprocessor Based Design Final Project**
 
